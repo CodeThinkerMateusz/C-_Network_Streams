@@ -9,13 +9,44 @@ public class ChatServer(IPAddress address, int port)
 {
     public async Task Run(CancellationToken ct)
     {
-        Console.WriteLine($"Server running on port {port} ...");
-        
-        // TODO
-        throw new NotImplementedException();
+        var listener = new TcpListener(IPAddress.Any, port);
+
+        try
+        {
+            listener.Start();
+            Console.WriteLine($"Server listening on port {port}");
+
+            while (!ct.IsCancellationRequested)
+            {
+                Console.WriteLine("Waiting for first client...");
+                TcpClient client1 = await listener.AcceptTcpClientAsync(ct);
+                Console.WriteLine("Client 1 connected");
+
+                Console.WriteLine("Waiting for second client...");
+                TcpClient client2 = await listener.AcceptTcpClientAsync(ct);
+                Console.WriteLine("Client 2 connected");
+
+
+                await HandleClientsAsync(client1, client2, ct);
+                Console.WriteLine("Chat ended, waiting for new clients");
+            }
+        }
+        catch(OperationCanceledException)
+        {
+            Console.WriteLine("Server shutting down...");
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine($"Serwer Error {ex.Message}");
+        }
+        finally
+        {
+            listener.Stop();
+            Console.WriteLine("Server stopped");
+        }
     }
-    
-    
+
+
     static async Task HandleClientsAsync(TcpClient client1, TcpClient client2, CancellationToken ct)
     {
         await using var stream1 = client1.GetStream();
@@ -58,8 +89,28 @@ public class ChatServer(IPAddress address, int port)
     
     static async Task ForwardMessagesAsync(MessageReader reader, MessageWriter writer, CancellationToken ct)
     {
-        // TODO
-        throw new NotImplementedException();
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                MessageDTO? msg = await reader.ReadMessage(ct);
+                if (msg == null)
+                    return;
+
+                Console.WriteLine($"[{msg.Time:u}] {msg.Sender} : {msg.Content}");
+
+                await writer.WriteMessage(msg, ct);
+                
+            }
+        }
+        catch(OperationCanceledException)
+        {
+            return;
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine($"Exception {ex.Message}");
+        }
     }
 
 
